@@ -1,0 +1,24 @@
+services:
+  datadog:
+    image: datadog/agent:7.26.0 # Specific version for stability
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=datadoghq.eu # Specify if using the EU servers
+      - DD_LOGS_ENABLED=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      - DD_AC_EXCLUDE="name:datadog-agent"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: [ "CMD", "agent", "status" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sail
+    restart: unless-stopped # Ensures the agent restarts unless stopped manually
+networks:
+  sail:
+    external: true
+    driver: bridge
