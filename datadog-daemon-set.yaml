@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: datadog-agent
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: datadog-agent
+  template:
+    metadata:
+      labels:
+        app: datadog-agent
+      annotations:
+        ad.datadoghq.com/datadog.logs: '[{"source": "kubernetes", "service": "k8s"}]'
+    spec:
+      containers:
+      - name: datadog-agent
+        image: datadog/agent:7.26.0
+        imagePullPolicy: Always
+        env:
+        - name: DD_KUBELET_TLS_VERIFY
+          value: "false"
+        - name: MY_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: KUBELET_HOST
+          value: "$(MY_NODE_IP)"
+        - name: DD_KUBELET_HOST
+          value: "$(MY_NODE_IP)"
+        - name: DD_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: datadog-secret
+              key: api-key
+        - name: DD_SITE
+          value: "datadoghq.eu"
+        - name: DD_LOGS_ENABLED
+          value: "true"
+        - name: DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL
+          value: "true"
+        volumeMounts:
+        - name: dockersock
+          mountPath: /var/run/docker.sock
+        - name: procdir
+          mountPath: /host/proc
+          readOnly: true
+        - name: cgroups
+          mountPath: /host/sys/fs/cgroup
+          readOnly: true
+      volumes:
+      - name: dockersock
+        hostPath:
+          path: /var/run/docker.sock
+      - name: procdir
+        hostPath:
+          path: /proc
+      - name: cgroups
+        hostPath:
+          path: /sys/fs/cgroup
+---
+apiVersion: datadoghq.com/v2alpha1
+kind: DatadogAgent
+metadata:
+  name: datadog
+spec:
+  global:
+    credentials:
+      apiSecret:
+        keyName: api-key
+        secretName: datadog-secret
+      appSecret:
+        keyName: app-key
+        secretName: datadog-secret
+  features:
+    logCollection:
+      enabled: true
+      containerCollectAll: true
